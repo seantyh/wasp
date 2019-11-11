@@ -1,0 +1,1 @@
+# Word Action-Sense Pair (WASP)
