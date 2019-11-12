@@ -6,6 +6,14 @@
 data/
 resources/
 
+### JupyterNotebooks ###
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
