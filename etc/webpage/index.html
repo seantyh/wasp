@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>ISA Item Graph</title>
+  <script src="https://code.jquery.com/jquery-3.4.1.min.js" type="text/javascript"></script>
+  <script src="https://unpkg.com/konva@4.1.6/konva.min.js"></script>
+</head>
+
+<body>
+  <span id="index" style="margin: 1%;">0</span>
+  <input type="button" value="Prev" id="prev_btn">
+  <input type="button" value="Next" id="next_btn">
+  
+  <div id="container"></div>
+  
+  <script>
+    const UPLINK = 1;
+    const DOWNLINK = 2;
+    class ItemGraph {
+
+      constructor(item_data) {
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+        this.item_data = item_data;
+        this.layout = {};
+
+        var stage = new Konva.Stage({
+          container: 'container',
+          width: width,
+          height: height
+        });
+
+        var layer = new Konva.Layer();
+                
+        let question_grp = this.text_layout(item_data.question,
+          600, 200, "question");
+        question_grp.x(600-question_grp.getClientRect().width/2);
+        console.log("dummy_grp", question_grp.getClientRect());
+        layer.add(question_grp);
+
+        for (const [i, opt_x] of item_data.options.entries()) {
+          let grp_x = 100 + 500 * (i % 2);
+          let grp_y = 100 + 200 * Math.floor(i / 2);
+          console.log(`${i}, ${grp_x}, ${grp_y}`);
+          let opt_grp_x = this.text_layout([`${i + 1}. `].concat(opt_x), grp_x, grp_y, "option" + (i + 1));
+          layer.add(opt_grp_x);
+        }
+
+        let edge_grp = this.edge_layout(item_data.graph);
+
+        layer.add(edge_grp);
+        stage.add(layer);
+      }
+
+      text_layout(tokens, init_x, init_y, grp_id) {
+        let layout = this.layout;
+        let group = new Konva.Group({
+          x: init_x, y: init_y, id: grp_id
+        });
+
+        let width_counter = 0;
+        for (const tok of tokens) {
+          var text_token = new Konva.Text({
+            x: width_counter,
+            text: tok,
+            fontSize: 30,
+            fill: 'black',
+            fontFamily: "微軟正黑體"
+          });
+
+          let tok_layout = this.layout[tok] || [];
+          tok_layout.push([group, text_token]);
+          this.layout[tok] = tok_layout;
+          let tok_width = text_token.width();
+          width_counter += tok_width;
+          group.add(text_token);
+        }
+        return group;
+      }
+
+      get_location(grp, tok, link_type) {
+        let w = tok.width();
+        let h = tok.height();
+        if (link_type == UPLINK) {
+          if (grp.id() == "question") {
+            return [grp.x() + tok.x() + w / 2, grp.y() + tok.y()];
+          } else {
+            return [grp.x() + tok.x() + w / 2, grp.y() + tok.y() + h];
+          }
+        } else {
+          if (grp.id() == "question") {
+            return [grp.x() + tok.x() + w / 2, grp.y() + tok.y() + h];
+          } else {
+            return [grp.x() + tok.x() + w / 2, grp.y() + tok.y()];
+          }
+        }
+      }
+
+      get_edge_path(start_loc, end_loc) {
+        return [
+          start_loc[0], start_loc[1],
+          start_loc[0], (start_loc[1] + end_loc[1]) / 2,
+          end_loc[0], (start_loc[1] + end_loc[1]) / 2,
+          end_loc[0], end_loc[1]
+        ]
+      }
+
+      edge_layout(G) {
+        let layout = this.layout;
+        let edge_grp = new Konva.Group(0, 0);
+        for (const edge_x of G.edges) {
+          let [start, end, edata] = edge_x;
+
+          for (let start_x of this.layout[start]) {
+            let [start_grp, start_tok] = start_x;
+            for (let end_x of this.layout[end]) {
+              let [end_grp, end_tok] = end_x;
+              // debugger;
+              if (start_grp == end_grp) continue;
+              if (!(start_grp.id() == 'question' && end_grp.id().match(/option/))) {
+                continue;
+              }
+
+
+              let link_type;
+              if (start_grp.id().match(/option[12]/) || end_grp.id().match(/option[12]/)) {
+                link_type = UPLINK;
+              } else {
+                link_type = DOWNLINK;
+              }
+
+              let start_loc = this.get_location(start_grp, start_tok, link_type);
+              let end_loc = this.get_location(end_grp, end_tok, link_type);
+              let edge_path = this.get_edge_path(start_loc, end_loc);
+              console.log(start, end);
+              let link_x = new Konva.Line({
+                points: edge_path,
+                stroke: 'gray',
+                strokeWidth: 1,
+                bezier: true
+              });
+              let label_x = new Konva.Text({
+                x: (start_loc[0]+end_loc[0])/2,
+                y: (start_loc[1]+end_loc[1])/2,
+                text: edata["rel"],
+                fontSize: 12,
+                fill: 'gray',
+                fontFamily: "微軟正黑體"
+              })
+
+              edge_grp.add(link_x);
+              edge_grp.add(label_x);
+            }
+          }
+        }
+
+        return edge_grp;
+      }
+    }
+
+    $.getJSON("/data/item_pool/item_pool_graph.json", (data) => {
+      this.data_cursor = 0;      
+      this.items = data;
+      item_graph = new ItemGraph(data[this.data_cursor]);
+    })
+    
+    $("#next_btn").click((ev)=>{
+      if (this.data_cursor == this.items.length-1){
+        return;
+      }
+      this.data_cursor += 1;
+      $("#index").html(this.data_cursor);
+      item_graph = new ItemGraph(this.items[this.data_cursor])
+    });
+
+    $("#prev_btn").click((ev)=>{
+      if (this.data_cursor == 0){
+        return;
+      }
+      this.data_cursor -= 1;
+      $("#index").html(this.data_cursor);
+      item_graph = new ItemGraph(this.items[this.data_cursor])
+    });
+  </script>  
+</body>
+
+</html>
