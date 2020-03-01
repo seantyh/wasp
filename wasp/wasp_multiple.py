@@ -4,15 +4,18 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from transformers import BertModel, BertPreTrainedModel
 from .wasp_n2v import NodeEmbedding
+from .utils import get_data_path
 
+N2V_PATH = str(get_data_path("sem_graph", "node2vec_sem_graph.pkl"))
 class BertForMultipleChoiceWasp(BertPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
         self.bert = BertModel(config)        
-        self.use_n2v = config.use_n2v
+        self.use_n2v = config.use_n2v if hasattr(config, "use_n2v") else True
         if self.use_n2v:
-            n2v = NodeEmbedding(config.n2v_path)            
+            n2v_path = config.n2v_path if hasattr(config, "n2v_path") else N2V_PATH
+            n2v = NodeEmbedding(n2v_path)            
             self.n2v_emb = n2v.get_n2v_embedding_layer()            
             hidden_size = config.hidden_size + n2v.dim            
         else:

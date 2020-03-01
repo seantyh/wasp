@@ -4,6 +4,6 @@ python run_multiple_choice.py^
     --model_type=bert^
     --model_name_or_path=bert-base-chinese^
     --output_dir=../data/sem_model_base/^
-    --do_train^
+    --do_eval^
     --overwrite_output_dir^
     --no_cuda
