@@ -150,10 +150,12 @@ def train(args, train_dataset, model, tokenizer, n2v):
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     set_seed(args)  # Added here for reproductibility
     for _ in train_iterator:        
-        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
-        for step, batch in enumerate(epoch_iterator):
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])        
+
+        for step, batch in enumerate(epoch_iterator):                    
             model.train()            
             batch = tuple(t.to(args.device) for t in batch)
+            rnn_hidden = model.init_rnn_hidden(batch[0].size(0)).to(args.device)
             inputs = {
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
@@ -162,6 +164,7 @@ def train(args, train_dataset, model, tokenizer, n2v):
                     else None,  # XLM don't use segment_ids
                 "n2v_ids": batch[3],
                 "labels": batch[4],
+                "rnn_hidden": rnn_hidden
             }
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
@@ -274,6 +277,7 @@ def evaluate(args, model, tokenizer, n2v, prefix="", test=False):
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
             model.eval()
             batch = tuple(t.to(args.device) for t in batch)
+            rnn_hidden = model.init_rnn_hidden(batch[0].size(0)).to(args.device)
 
             with torch.no_grad():
                 inputs = {
@@ -284,6 +288,7 @@ def evaluate(args, model, tokenizer, n2v, prefix="", test=False):
                     else None,  # XLM don't use segment_ids
                     "n2v_ids": batch[3],
                     "labels": batch[4],
+                    "rnn_hidden": rnn_hidden
                 }
                 outputs = model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
